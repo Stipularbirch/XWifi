@@ -50,7 +50,7 @@ def initialize_driver( f_profile_dir, f_binary, f_profile, ua ):
 	f_cache_dir = sel_slice1 + "/.cache/mozilla" + sel_slice2
 
 	f_options = webdriver.FirefoxOptions()
-	f_options.headless = False
+	f_options.headless = True
 	f_options.accept_insecure_certs = True
 	f_options.set_capability("pageLoadStrategy","none")
 	f_options.set_preference("browser.cache.disk.parent_directory",
