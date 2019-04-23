@@ -1,0 +1,83 @@
+Version 1.1
+
+Bug Fixes/Improvements
+	Staple, when executing, follows symlink instead of relying on locate
+		and correct naming structure
+	When checking if Selenium profile exists, instead of relative path uses 
+		absolute path
+	Symlink created from $PARENT_DIR not hardcoded string
+	Removed lines for redundant check for global_vars file and creation,
+		firefox profile prefs.js pre removal, reference to undefined var
+		$STARTING_DIR
+	Script1, reduced time to wait to start pinging xfinity to 1 second
+	Script1 fixed stale DIG_DNS, update every 6 failed attemps
+	Script1 dig option +noedns added. Ignores server malformed packets 
+	Script1 creates lock file to manage Script2 monitoring
+	python execution still not working correctly, variation in code
+	$T_ACT value never exceeds $T_REF value during normal cycle
+	Script1 and Script2 use same command to identify which interface to use
+		no total shutdown due to mismatched when 2 or more network 
+		interfaces present
+	Script2 no more nm dependence, checks /sys/class/net/ directory
+	Script2 curl query max time 2 seconds
+	Script2 uses Script1 lock file instead of cumbersome strace
+	Script2 now checks and resolves no default gateway
+	Script2 tries to enable default device if done, else exits
+	Script2 Checks ever 3 seconds, less sleeping if required to ReSync Script1
+	
+	Logger new Class and Function structures. Smart useragent, email, fake name,
+		generation, and colusion avoidance. 
+	
+
+--------------------------------------------------------------------------------
+
+Version 1.0
+
+New Features
+	Refer dhcp to use preset Comcast DNS, if possible
+	Subvert to 3rd party DNS After Comcast Authentication  
+	Staple Defined in Path
+	Use/Create Custom Firefox Profile, maintain Comcast Cache
+	Force temp Selenium profile to make permenant changes   
+	
+Bug Fixes/Improvements
+	Ensure requested dig is translated, if ! xxx.xxx.xxx.xxx -> try again
+	No garbage temp files outside target directory*
+	Removed redundant locating of target directory in disowned children
+	Script2 no dig loop fixed
+	If logger timesout, relaunches but already has Auth, set 30 min as default 
+	Kill only logger firefox children
+	Remove firefox cookies with specificity 
+
+Notes
+ -  staple has harcoded string looking for  ~/.mozilla/firefox and passing to
+	logger.py
+ -  logger.py has hardcoded strings for firefox-esr binary directory, receives
+	string passed from staple, and expects ~/.cache/mozilla/firefox to be 
+	a valid directory
+ -  network-manager and nmcli is require to run staple
+ -	staple finds parent directory by looking for it, an erronous result
+	could be found if similarly named directory exists
+ -  ***There is no support for 2 wireless network interfaces, results may vary***
+ -  strace and macchanger are dependancies of staple
+ -  selenium and python_arptable are dependancies of logger.py
+ -  script1.sh when prompting ping dig not resolved, will eventually resolve
+    	if it is possible by directly asking 75.75.75.75
+ -  For faster reconnection performance disable ipv6. Check if dhcp is being
+	defered to uses static dns 75.75.75.75, 75.75.76.76 by changes made in 
+	staple script, if not manually defer dhcp.
+ -  Make sure network-manager ignores ipv6 for xfinitywifi to avoid libndp error
+ -  If dhclient is used by network manager comment out current requests in dhclient.conf
+	to replace with: 
+   	request subnet-mask, broadcast-address, time-offset, routers,
+		interface-mtu, rfc3442-classless-static-routes;
+ -  Add the following to NetworkManager.conf
+		[device]
+		wifi.scan-rand-mac-address=no
+ -  If firefox is main browser, in about:config set network.captive-portal-service.enabled 
+	to false for less interference
+ -  Rare bug occurs where NetworkManager forgets/loses default gateway after
+	successful authentication
+
+0m18.061s
+*Unconfirmed
