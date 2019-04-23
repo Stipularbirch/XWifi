@@ -12,7 +12,8 @@ SLEEP_TIME=3
 if [ -z $1 ] ; then
 	echo -e "\n[${YELLOW}!${NC}] Error with Firefox Profile [${YELLOW}!${NC}]\n"
 	echo -e "\tEXITING SCRIPT\n"
-	sleep 3
+	sleep 7
+	killall xterm >/dev/null 2>&1
 	exit
 fi 
 
@@ -37,7 +38,8 @@ while : ; do
 		#Check if DEFAULT_DEVICE is up
 		if [[ "$STATE" == "down" ]] ; then
 			clear
-			echo -e "\n[${YELLOW}!${NC}] Err: DEFAULT DEVICE IS NOT UP [${YELLOW}!${NC}]\n"
+			echo -e "[${YELLOW}!${NC}] Err: DEFAULT DEVICE IS NOT UP [${YELLOW}!${NC}]\n"
+			sleep 2
 			ifconfig $DEFAULT_DEVICE up
 			if [ $? -eq 0 ] ; then
 				continue;
@@ -65,7 +67,8 @@ while : ; do
 		if [[ -z $DEFAULT_GW ]] ; then
 			clear		
 			systemctl restart network-manager 
-			echo -e "\n[${YELLOW}!${NC}] Err: NO DEFAULT GATEWAY [${YELLOW}!${NC}]\n"
+			echo -e "[${YELLOW}!${NC}] Err: NO DEFAULT GATEWAY [${YELLOW}!${NC}]\n"
+			sleep 2
 			while true ; do 
 				ip route show
 				if [[ $? -eq 0 ]] ; then
@@ -90,10 +93,9 @@ while : ; do
 				fi
 				sudo xterm -T "Xfinity Wifi" -geometry 70x20+0+0 -fa monospace -fs 8 -e "./script1.sh $SELENIUM_FIREFOX"  & disown
 				echo -e "Active$CYAN FIDELITY$NC Monitoring$YELLOW ReSynced$NC [${RED}+${NC}]"
-				sleep 5
-				clear
-				echo -e "Active$CYAN FIDELITY$NC Monitoring [${RED}+${NC}]"
+				sleep 2
 				COUNTER=7
+				continue
 			fi
 			((DOUBLE_CHECK++))
 			sleep 1
