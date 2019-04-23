@@ -1,3 +1,5 @@
+--------------------------------------------------------------------------------
+
 Version 1.1
 
 Bug Fixes/Improvements
@@ -9,26 +11,33 @@ Bug Fixes/Improvements
 	Removed lines for redundant check for global_vars file and creation,
 		firefox profile prefs.js pre removal, reference to undefined var
 		$STARTING_DIR
-	Script1, reduced time to wait to start pinging xfinity to 1 second
+	Script1 reduced time to wait to start pinging xfinity to 1 second
 	Script1 fixed stale DIG_DNS, update every 6 failed attemps
 	Script1 dig option +noedns added. Ignores server malformed packets 
 	Script1 creates lock file to manage Script2 monitoring
-	python execution still not working correctly, variation in code
-	$T_ACT value never exceeds $T_REF value during normal cycle
-	Script1 and Script2 use same command to identify which interface to use
+	Script1	$T_ACT value never exceeds $T_REF value during normal cycle
+	Script1 and Script2 use same command to identify which interface to use,
 		no total shutdown due to mismatched when 2 or more network 
 		interfaces present
 	Script2 no more nm dependence, checks /sys/class/net/ directory
 	Script2 curl query max time 2 seconds
 	Script2 uses Script1 lock file instead of cumbersome strace
 	Script2 now checks and resolves no default gateway
-	Script2 tries to enable default device if done, else exits
-	Script2 Checks ever 3 seconds, less sleeping if required to ReSync Script1
-	
+	Script2 tries to enable default device if down, else exits
+	Script2 Checks every 3 seconds, less sleeping if required to ReSync Script1
 	Logger new Class and Function structures. Smart useragent, email, fake name,
-		generation, and colusion avoidance. 
-	
-
+		generation, and collision avoidance. 
+		
+Notes
+	- Script1 logger.py launch retry on error is broken
+	- A minuscule chance that logger will reach a collision if macchanger sets 
+	  a previously known by Comcast mac addr
+	- DIG_DNS can have a clunky path to resolution
+	- Unconfirmed if saving firefox cache fills up free disk space
+	- Need more testing to determine efficacy of Script2 checks and 
+	  resolutions
+	- 2 or more NICs may cause unforseen problems
+	  
 --------------------------------------------------------------------------------
 
 Version 1.0
