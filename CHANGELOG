@@ -1,3 +1,23 @@
+Version 1.2
+
+Bug Fixes/Improvements
+	Script1 fixed logger retrying form fillout actions
+	Script1 removed default time
+	Script1 using arrays to handle exit and retry_attempts
+	Script1 Restarts cycle if no free option found thus trying new mac, else
+		retry attempts for any other reason relaunches firefox
+	Logger had no set_time operation
+	Logger fixed parameter value assignment when retry attempt
+	Logger fixed timeout and driver_timeout global variable update
+	Logger Has 3 failed states that could be caught; Failed to launch,
+		No free Option page 1, Failed to fill of 1st,2nd,3rd or 4th page 
+Notes
+	- No long term testing, seems stable
+	- Still clunky DIG_DNS resolution, its possible that the worst resolution
+		path is not reachable 
+	- Hard-coded string in logger for firefox binary directory should be made
+		to be dynamic
+		
 --------------------------------------------------------------------------------
 
 Version 1.1

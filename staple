@@ -1,6 +1,6 @@
-#!/bin/bash 
+#!/bin/bash
+
 YELLOW="\033[1;33m"
-Orange="\033[0;33m"
 CYAN="\033[0;36m"
 RED="\033[0;31m"
 NC="\033[0m"

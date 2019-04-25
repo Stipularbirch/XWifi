@@ -1,4 +1,4 @@
-import time, secrets, platform, os, sys, csv, shutil
+import time, secrets, platform, os, sys, set_time, csv, shutil
 
 from faker import Faker
 from hashlib import blake2b
@@ -17,8 +17,8 @@ _random = secrets.SystemRandom()
 randrange = _random.randrange
 
 timeout_multiplier = 1
-driver_timeout = 15 # <-- Adjust in seconds
-driver_long_timeout = 25
+driver_timeout = 10 # <-- Adjust in seconds
+driver_long_timeout = 15
 
 def check_exists_by_xpath(xpath):
 	try:
@@ -29,16 +29,24 @@ def check_exists_by_xpath(xpath):
 	
 def check_input( parameters ):
 	profile_dir = None
+	global driver_timeout
+	global driver_long_timeout
+	global timeout_multiplier
 	
 	if len(parameters) == 2:
 		profile_dir = str(sys.argv[1])
 	
 	elif len(sys.argv) == 3:
 		try:
+			profile_dir = str(sys.argv[1])
 			timeout_multiplier = int(sys.argv[2])
 		except ValueError:
 			print("Integer Value as Second Parameter only!")
 			timeout_multiplier = 3
+			
+	driver_timeout = timeout_multiplier * driver_timeout
+	driver_long_timeout = timeout_multiplier * driver_long_timeout
+	
 	return profile_dir
 	
 def initialize_profile( f_profile_dir ):				
@@ -50,7 +58,7 @@ def initialize_driver( f_profile_dir, f_binary, f_profile, ua ):
 	f_cache_dir = sel_slice1 + "/.cache/mozilla" + sel_slice2
 
 	f_options = webdriver.FirefoxOptions()
-	f_options.headless = True
+	f_options.headless = False
 	f_options.accept_insecure_certs = True
 	f_options.set_capability("pageLoadStrategy","none")
 	f_options.set_preference("browser.cache.disk.parent_directory",
@@ -124,12 +132,26 @@ class XfinityForms( User ):
 		wait = self.wait
 		
 		driver.get( self.url_wifiondemand )
-		free_opt = wait.until(EC.presence_of_element_located((By.XPATH,"//*[contains(text(), 'Complimentary')]")))
+		
+		try:
+			free_opt = wait.until(EC.presence_of_element_located((By.XPATH,"//*[contains(text(), 'Complimentary')]")))
+		except TimeoutException:
+			driver.close()
+			sys.exit(255)
 				
 		first_submit = wait.until(EC.presence_of_element_located((By.ID,"continueButton")))
 		driver.execute_script("window.stop();")
 
 		free_opt.click()
+		
+		time_tuple = driver.execute_script("var date = new Date($.ajax({" 				+ \
+			"async: false, type: 'GET', contentType: 'application/json;charset=utf-8'" 	+ \
+			"}).getResponseHeader( 'Date' )); return [ " 								+ \
+			"date.getFullYear(), date.getMonth() + 1, date.getDate(), "					+ \
+			"date.getHours(), date.getMinutes(), date.getSeconds(), 0]")
+		
+		set_time._linux_set_time(time_tuple)
+		
 		first_submit.click()
 
 		if check_exists_by_xpath("/html/body/div[1]/div/div[3]/div[2]"):
@@ -234,12 +256,13 @@ user_agent = generate_user_agent()
 driver = initialize_driver( f_profile_dir, f_binary_dir, f_profile, user_agent )
 xfinity = XfinityForms( driver )
 
-xfinity.first_page()
-xfinity.second_page()
-xfinity.third_page()
-xfinity.fourth_page()
-
+try:
+	xfinity.first_page()
+	xfinity.second_page()
+	xfinity.third_page()
+	xfinity.fourth_page()
+except:
+	driver.close()
+	sys.exit(254)
+	
 xfinity.tear_down( f_profile, f_profile_dir )
-
-
-

@@ -1,4 +1,5 @@
 #!/bin/bash
+
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
@@ -10,10 +11,10 @@ SLEEP_TIME=3
 
 #Check That Firefox Profile was Passed
 if [ -z $1 ] ; then
-	echo -e "\n[${YELLOW}!${NC}] Error with Firefox Profile [${YELLOW}!${NC}]\n"
+	echo -e "[${YELLOW}!${NC}] Error with Firefox Profile [${YELLOW}!${NC}]\n"
 	echo -e "\tEXITING SCRIPT\n"
-	sleep 7
 	killall xterm >/dev/null 2>&1
+	sleep 7
 	exit
 fi 
 
@@ -60,7 +61,6 @@ while : ; do
 			killall xterm >/dev/null 2>&1
 			exit
 		fi
-		
 		
 		#Check if bad default gateway
 		DEFAULT_GW=$( ip route show )
