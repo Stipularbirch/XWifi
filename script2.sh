@@ -9,17 +9,23 @@ DOUBLE_CHECK=1
 COUNTER=7
 SLEEP_TIME=3
 
-#Check That Firefox Profile was Passed
+#Check That Firefox Profile, and Bin Dir was Passed
 if [ -z $1 ] ; then
-	echo -e "[${YELLOW}!${NC}] Error with Firefox Profile [${YELLOW}!${NC}]\n"
+	echo -e "[${RED}!${NC}] Error with Firefox Profile [${RED}!${NC}]\n"
 	echo -e "\tEXITING SCRIPT\n"
-	killall xterm >/dev/null 2>&1
 	sleep 7
 	exit
+elif [ -z $2 ] ; then
+	echo -e "\n[${RED}!${NC}] Error with Firefox Bin Dir [${RED}!${NC}]\n"
+	echo -e "\tEXITING SCRIPT\n"
+	sleep 7
+	exit	
 fi 
 
 SELENIUM_FIREFOX="$1"
-DEFAULT_DEVICE=$( ip -br link | awk '/<BROADCAST/ {print $1; exit}' )
+SELENIUM_F_BIN="$2"
+
+DEFAULT_DEVICE=$( ip -br link | awk '/<BROADCAST,MULTICAST,UP/ {print $1; exit}' )
 
 #Main Loop, Ensure Connectivity
 while : ; do
@@ -85,14 +91,15 @@ while : ; do
 			if [[ `expr $DOUBLE_CHECK % 5` -eq 0 ]]; then
 				DOUBLE_CHECK=1
 				SCRIPT_CHECK=$(pgrep -f script1.sh)
-				echo -e "Internet$YELLOW DISCONTINUITY$NC Detected [${RED}!${NC}] \n"
+				echo -e "Internet$YELLOW DISCONTINUITY$NC Detected [${YELLOW}!${NC}] \n"
 				sleep 1
 				clear
 				if [ -n "$SCRIPT_CHECK" ]; then
 					for pid in $(pgrep -f script1); do kill -9 $pid; done
 				fi
-				sudo xterm -T "Xfinity Wifi" -geometry 70x20+0+0 -fa monospace -fs 8 -e "./script1.sh $SELENIUM_FIREFOX"  & disown
-				echo -e "Active$CYAN FIDELITY$NC Monitoring$YELLOW ReSynced$NC [${RED}+${NC}]"
+				sudo xterm -T "Xfinity Wifi" -geometry 70x20+0+0 -fa monospace -fs 8 \
+						-e "./script1.sh $SELENIUM_FIREFOX $SELENIUM_F_BIN" & disown
+				echo -e "Active$CYAN FIDELITY$NC Monitoring$YELLOW ReSynced$NC [${YELLOW}+${NC}]"
 				sleep 2
 				COUNTER=7
 				continue

@@ -1,3 +1,25 @@
+Version 1.3
+
+Bug Fixes/Improvements
+	Staple checks and finds firefox binary directory, propogates directory
+		info to Script1 -> (Script2, Logger) 
+	Staple now makes sure that DIG_DNS can resolve after checking network-manager
+		is a running process, instead of doing check in Script1
+	Script1 does not check to shred txt, or log files
+	Script1 logs stderr and stdout to firefox.log
+	Script1 improved logic for controling python execution and error controll
+	Logger has log_path in webdriver for generated geckodriver.log to /dev/null
+	Logger waits to get password fields before stoping web javascript
+	Staple, Script1 and Script2 uses NIC that not just BROADCAST but also UP
+	
+Notes
+	- If more than one NIC exits, first one to be found by command ip, will be
+		used. For specific device, ifconfig "interface" down all others
+	- Launching firefox always creates empty log file, there maybe a better
+		way than to check if empty => delete everytime fireox is launnched
+
+--------------------------------------------------------------------------------
+
 Version 1.2
 
 Bug Fixes/Improvements

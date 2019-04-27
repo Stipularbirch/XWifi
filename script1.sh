@@ -7,25 +7,35 @@ NC='\033[0m'
 
 CYCLECOUNT=0
 SLOWPING=6
-RETRY_ATTEMPTS=(2 2) #1st index modifiable value, 2nd stored restore value
+RETRY_ATTEMPTS=(2 2) #1st is actual value, 2nd same value to replace 1st 
 
-IFACE=$( ip -br link | awk '/<BROADCAST/ {print $1; exit}' )
+IFACE=$( ip -br link | awk '/<BROADCAST,MULTICAST,UP/ {print $1; exit}' )
 RES_DNS=$( cat /etc/resolv.conf 2> /dev/null )
 DIG_DNS=$( dig +time=3 +tries=1 +noedns +noall +answer +short \
 		  xfwweb.g.comcast.net @75.75.75.75 )
+
+function check_firefoxlog_empty {
+	[[ -s './firefox.log' ]] || shred -fzu -n 1 './firefox.log' 
+}
 		  
-#Check That Firefox Profile was Passed
+#Check That Firefox Profile, and Bin Dir was Passed
 if [ -z $1 ] ; then
-	echo -e "\n[${YELLOW}!${NC}] Error with Firefox Profile [${YELLOW}!${NC}]\n"
+	echo -e "[${RED}!${NC}] Error with Firefox Profile [${RED}!${NC}]\n"
 	echo -e "\tEXITING SCRIPT\n"
-	sleep 3
+	sleep 7
 	exit
+elif [ -z $2 ] ; then
+	echo -e "\n[${RED}!${NC}] Error with Firefox Bin Dir [${RED}!${NC}]\n"
+	echo -e "\tEXITING SCRIPT\n"
+	sleep 7
+	exit	
 fi 
 
 SELENIUM_FIREFOX="$1"
+SELENIUM_F_BIN="$2"
 
 #Garbage Collection
-shred -fzu -n 1 *.txt *.log *.out *.lock wget* 2>/dev/null &
+shred -fzu -n 1 *.out *.lock wget* 2>/dev/null &
 
 while : ; do
 	clear
@@ -44,13 +54,6 @@ while : ; do
 	echo -e "\nWaiting for Connection [${YELLOW}?${NC}] \n"
 	
 	sleep 1 # Dont Spam NetworkManager Prematurely 
-	
-	#Ensure DIG Address is Valid
-	while [[ ! $DIG_DNS =~ ([0-9]{1,3}\.)+([0-9]{1,3}) ]] ; do
-		echo -e "[${YELLOW}!${NC}] Err: Ping Server Not Resolved, Retrying [${YELLOW}!${NC}]\n"
-		DIG_DNS=$(dig +time=1 +tries=1 +noedns +noall +answer +short xfwweb.g.comcast.net @75.75.75.75)
-		sleep 1.25
-	done
 		
 	#Wait For Established Connection	
 	while true ; do
@@ -71,54 +74,51 @@ while : ; do
 
 	echo -e "Headless Firefox Launched [${YELLOW}+${NC}]\n"
 	
-	python3 logger.py "$SELENIUM_FIREFOX" #2>/dev/null 
+	python3 logger.py "$SELENIUM_FIREFOX" "$SELENIUM_F_BIN" >> firefox.log 2>&1 
 	EXIT_RETRY=($? 1)
-	
+	check_firefoxlog_empty 
 	# Catch error code from Firefox, keep retrying for RETRY_ATTEMPTS amount
 
-	if [[ ${EXIT_RETRY[0]} -eq 255 && ${RETRY_ATTEMPTS[0]} -lt 1 ]] ; then 					#No Free Option
+	if [[ ${EXIT_RETRY[0]} -eq 255 && ${RETRY_ATTEMPTS[0]} -lt 1 ]] ; then 					#No Free Option, No attempts left, exit
 		echo -e "[${RED}!${NC}] Err: No Free Opt Dectected, Exiting [${RED}!${NC}]\n"	
 		sleep 7
-		killall xterm >/dev/null 2>&1
-		exit
-	elif [[ ${EXIT_RETRY[0]} -eq 255 && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; then				#No Free Option, No attempts left, exit
+		killall xterm > /dev/null 2>&1
+	elif [[ ${EXIT_RETRY[0]} -eq 255 && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; then				#No Free Option, restart at the begining
 		echo -e "[${YELLOW}!${NC}] Err: No Free Opt Dectected, Retrying with New Mac [${YELLOW}!${NC}]\n"	
 		sleep 2
 		((RETRY_ATTEMPTS[0]--))
 		continue
-	elif [[ ${EXIT_RETRY[0]} -eq 254 && ${RETRY_ATTEMPTS[0]} -lt 1 ]] ; then 				#1 of the 4 Forms Failed to complete
-		echo -e "[${YELLOW}!${NC}] Err: Failed To Complete a Form Page [${YELLOW}!${NC}]\n"
-		sleep 2
-		((RETRY_ATTEMPTS[0]--))
-		continue
-	elif [[ ${EXIT_RETRY[0]} -eq 254 && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; then				#1 of the 4 Forms Failed to complete, No attempts left, exit
-		echo -e "[${RED}!${NC}] Err: Failed to Complete a Form Page [${RED}!${NC}]\n"	
+	elif [[ ${EXIT_RETRY[0]} -eq 254 && ${RETRY_ATTEMPTS[0]} -lt 1 ]] ; then 				#1 of the 4 Forms Failed to complete, No attempts left, exit
+		echo -e "[${RED}!${NC}] Err: Failed To Complete a Form Page [${RED}!${NC}]\n"
 		sleep 7
-		killall xterm >/dev/null 2>&1
-		exit
-	elif [[ ${EXIT_RETRY[0]} -ne 0 ]] ; then												#Failed To Launch
-		echo -e "[${YELLOW}!${NC}] Err: Filling Out Form Failed [${YELLOW}!${NC}]\n"	
+		killall xterm > /dev/null 2>&1
+	elif [[ ${EXIT_RETRY[0]} -eq 254 && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; then				#1 of the 4 Forms Failed to complete
+		echo -e "[${YELLOW}!${NC}] Err: Failed to Complete a Form Page [${YELLOW}!${NC}]\n"	
+		sleep 2
+	elif [[ ${EXIT_RETRY[0]} -ne 0 ]] ; then												#Failed to Launch, exit
+		echo -e "[${RED}!${NC}] Err: Failed To Launch Firefox [${RED}!${NC}]\n"	
+		sleep 7
 		#Clean Up Dead Children
 		kill -9 $(ps -ef | grep -P '(?!.*(/bin/bash|xterm -T))^(?=.*pts)(?=.*firefox)' \
-						 | awk '{ print $2 }') 2>/dev/null	
+						 | awk '{ print $2 }') 2>/dev/null
+		killall xterm > /dev/null 2>&1
 	fi
 	
 	while [[ ${EXIT_RETRY[0]} -ne 0  && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; do					#Try for RETRY_ATTEMPTS to re Launch
 		echo -e "Headless Firefox [${CYAN}Re${NC}]Launched [${YELLOW}!${NC}]\n"
 		((EXIT_RETRY[1]++))
 		
-		echo -e "\n\nEXIT_RETRY ATTEMPTS: ${EXIT_RETRY[1]}\n\n"
-		python3 logger.py "$SELENIUM_FIREFOX" ${EXIT_RETRY[1]} #2>/dev/null
-		sleep 10
+		python3 logger.py "$SELENIUM_FIREFOX" "$SELENIUM_F_BIN" ${EXIT_RETRY[1]} >> firefox.log 2>&1 
 		EXIT_RETRY[0]=$?
-		
+		check_firefoxlog_empty
+
 		((RETRY_ATTEMPTS[0]--))
 		
 		#Clean Up Dead Children
 		kill -9 $(ps -ef | grep -P '(?!.*(/bin/bash|xterm -T))^(?=.*pts)(?=.*firefox)' \
 						 | awk '{ print $2 }') 2>/dev/null
 	done
-			
+
 	if [[ ${EXIT_RETRY[0]} -ne 0 && ${EXIT_RETRY[1]} -ne 0 ]] ; then 						#Tried to Launch without Failure, No attempts left
 		echo -e "[${RED}!${NC}] Err: Form Could Not Be Filled Out [${RED}!${NC}]\n"
 		sleep 7
@@ -144,7 +144,8 @@ while : ; do
 	
 	#Check If Script2 Is Already Running
 	if [ -z "$(pgrep script2.sh)" ] ; then
-		sudo xterm -T "Xfinity Wifi" -geometry 70x5+0-0 -fa monospace -fs 8 -e "./script2.sh $SELENIUM_FIREFOX" & disown
+		sudo xterm -T "Xfinity Wifi" -geometry 70x5+0-0 -fa monospace -fs 8 \
+				-e "./script2.sh $SELENIUM_FIREFOX $SELENIUM_F_BIN" & disown
 	fi; clear
 	
 	((CYCLECOUNT++))

@@ -28,26 +28,28 @@ def check_exists_by_xpath(xpath):
 	return True
 	
 def check_input( parameters ):
-	profile_dir = None
+	profile_dir = bin_dir = None
 	global driver_timeout
 	global driver_long_timeout
 	global timeout_multiplier
 	
-	if len(parameters) == 2:
+	if len(parameters) == 3:
 		profile_dir = str(sys.argv[1])
+		bin_dir = str(sys.argv[2])
 	
-	elif len(sys.argv) == 3:
+	elif len(sys.argv) == 4:
 		try:
 			profile_dir = str(sys.argv[1])
-			timeout_multiplier = int(sys.argv[2])
+			bin_dir = str(sys.argv[2])
+			timeout_multiplier = int(sys.argv[3])
 		except ValueError:
-			print("Integer Value as Second Parameter only!")
+			print("Integer Value as Third Parameter only!")
 			timeout_multiplier = 3
 			
 	driver_timeout = timeout_multiplier * driver_timeout
 	driver_long_timeout = timeout_multiplier * driver_long_timeout
 	
-	return profile_dir
+	return profile_dir, bin_dir
 	
 def initialize_profile( f_profile_dir ):				
 	firefox_profile = webdriver.FirefoxProfile(f_profile_dir)
@@ -58,16 +60,15 @@ def initialize_driver( f_profile_dir, f_binary, f_profile, ua ):
 	f_cache_dir = sel_slice1 + "/.cache/mozilla" + sel_slice2
 
 	f_options = webdriver.FirefoxOptions()
-	f_options.headless = False
+	f_options.headless = True
 	f_options.accept_insecure_certs = True
 	f_options.set_capability("pageLoadStrategy","none")
 	f_options.set_preference("browser.cache.disk.parent_directory",
 										f_cache_dir)
 	f_options.set_preference("general.useragent.override", 
 										ua )
-	driver = webdriver.Firefox( firefox_binary=f_binary, 
-									options=f_options, 
-									firefox_profile=f_profile)
+	driver = webdriver.Firefox( firefox_binary=f_binary, options=f_options, 
+								firefox_profile=f_profile, service_log_path=os.devnull)
 	return driver
 
 class User:
@@ -137,6 +138,7 @@ class XfinityForms( User ):
 			free_opt = wait.until(EC.presence_of_element_located((By.XPATH,"//*[contains(text(), 'Complimentary')]")))
 		except TimeoutException:
 			driver.close()
+			print("No Free Option To Select")
 			sys.exit(255)
 				
 		first_submit = wait.until(EC.presence_of_element_located((By.ID,"continueButton")))
@@ -182,13 +184,13 @@ class XfinityForms( User ):
 		unq_hostname = self.unq_hostname
 		
 		username = wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='usePersonalEmail']")))
+		password = driver.find_element_by_xpath("//input[@id='password']")
+		password_retype = driver.find_element_by_xpath("//input[@id='passwordRetype']")
 
 		driver.execute_script("window.stop();")
 
 		drop_menu = wait.until(EC.element_to_be_clickable((By.XPATH,"//select[@id='secretQuestion']//option[2]")))
 		secret_answer = driver.find_element_by_xpath("//input[@id='secretAnswer']")
-		password = driver.find_element_by_xpath("//input[@id='password']")
-		password_retype = driver.find_element_by_xpath("//input[@id='passwordRetype']")
 		third_submit = wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='submitButton']")))
 
 		username.click()
@@ -248,8 +250,7 @@ class XfinityForms( User ):
 				shutil.move(src_file, dst_dir)
 		driver.quit()
 		
-f_profile_dir = check_input( sys.argv )
-f_binary_dir = "/usr/bin/firefox-esr"
+f_profile_dir, f_binary_dir = check_input( sys.argv )
 f_profile = initialize_profile( f_profile_dir )
 user_agent = generate_user_agent()
 
@@ -263,6 +264,7 @@ try:
 	xfinity.fourth_page()
 except:
 	driver.close()
+	print(sys.exc_info()[0])
 	sys.exit(254)
 	
 xfinity.tear_down( f_profile, f_profile_dir )
