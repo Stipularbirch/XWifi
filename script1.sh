@@ -85,7 +85,6 @@ while : ; do
 		killall xterm > /dev/null 2>&1
 	elif [[ ${EXIT_RETRY[0]} -eq 255 && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; then				#No Free Option, restart at the begining
 		echo -e "[${YELLOW}!${NC}] Err: No Free Opt Dectected, Retrying with New Mac [${YELLOW}!${NC}]\n"	
-		sleep 2
 		((RETRY_ATTEMPTS[0]--))
 		continue
 	elif [[ ${EXIT_RETRY[0]} -eq 254 && ${RETRY_ATTEMPTS[0]} -lt 1 ]] ; then 				#1 of the 4 Forms Failed to complete, No attempts left, exit
@@ -103,7 +102,7 @@ while : ; do
 						 | awk '{ print $2 }') 2>/dev/null
 		killall xterm > /dev/null 2>&1
 	fi
-	
+
 	while [[ ${EXIT_RETRY[0]} -ne 0  && ${RETRY_ATTEMPTS[0]} -ne 0 ]] ; do					#Try for RETRY_ATTEMPTS to re Launch
 		echo -e "Headless Firefox [${CYAN}Re${NC}]Launched [${YELLOW}!${NC}]\n"
 		((EXIT_RETRY[1]++))
@@ -153,24 +152,24 @@ while : ; do
 	echo -e "Cycle Number: [${YELLOW}$CYCLECOUNT${NC}]\n"
 
 	#Check if Default is Set, Then Reference Time Given by Xfinity
-	TIME=($(awk -F ',' 'NR==2 { gsub(/\r/,"",$0); gsub("^0*", "", $0); print $1, $2 }' global_vars.csv))
+	TIME=($(awk -F ',' 'NR==2 { gsub(/\r/,"",$0); print $1, $2 }' global_vars.csv))
 	
-	HOURS=$(( ${TIME[0]} - $(date +%-H) ))
-	OFFSET=25 #Margin of Error in seconds 
+	HOURS=$(( ${TIME[0]} - ($(date +%-H) % 23) ))
+	OFFSET=20 #Margin of Error in seconds 
 	
 	#Determine Duration, deriving 12H Time from Military Time
-	if [ $HOURS -eq 24 ] ; then 
- 		MINS=$(( (60 % ${TIME[1]}) + $(date +%-M) ))
-	elif [ $HOURS -ne 0 ] ; then
+	if [ ${TIME[0]} -eq 0 ] ; then 						#23H -> 00H
+		MINS=$(( ( 60 - $(date +%-M)) + ${TIME[1]} ))
+	elif [ $HOURS -gt 0 ] ; then						#[1H-22H] -> [2H-23H]
 		HOURS=$(( $HOURS - 1 ))
-		MINS=$(( ${TIME[1]} + (60 - $(date +%-M)) ))
+		MINS=$(( ${TIME[1]} + (60 - $(date +%-M)) ))	
 	else 
-		MINS=$(( $(date +%-M) - ${TIME[1]} ))
+		MINS=$(( ${TIME[1]} - $(date +%-M) ))			# >1H, Mins Only
 	fi
 
 	SECS=$(( ($HOURS * 600) + ($MINS * 60) - $OFFSET))
 	T_REF=$(date +%s -d +${SECS}sec)
-
+	
 	while [ $SECS -gt 1 ] ; do
 		T_ACT=$(( ($(date +%s) - 1) - $OFFSET))
 		#Hibernating Device ReSync

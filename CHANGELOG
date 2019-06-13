@@ -1,3 +1,28 @@
+Version 1.4
+
+Bug Fixes/Improvements
+	Script1 bug in time conversion resolved
+	Logger third page final submit wait until element_to_be_clickable instead
+		of presence, elementnotinteractable exception issue
+	Logger third page military time conversion no longer adds 12 to 12am
+		creating value of 24, rather a value of 0
+	Logger, on caught exceptions that do not have a special case, now logs
+		timestamp and more info on nature of error to firefox.log. Func
+		portal_authenticate loops over each page for execution.
+	Logger no longer saves copys firefox temp cache, only closes webdriver
+		
+Notes
+	- Xfinity updated UI to use 3 pages instead of 4, no more zip code 
+		aswell
+	- Logger currently suffers from inability to be headless or minimization
+		of browser window. Explicit wait for element_to_be_clickable is the 
+		likely culprit.
+	- timeout set to wait 20s and long_wait 25 as default
+	- media.cache_readahead_limit in firefox about:config could be adjusted 
+		for smoother video watching between cycles
+
+--------------------------------------------------------------------------------
+
 Version 1.3
 
 Bug Fixes/Improvements

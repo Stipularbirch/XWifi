@@ -1,4 +1,4 @@
-import time, secrets, platform, os, sys, set_time, csv, shutil
+import datetime, time, secrets, platform, os, sys, set_time, csv, shutil, re, inspect
 
 from faker import Faker
 from hashlib import blake2b
@@ -11,18 +11,27 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.support import expected_conditions as EC
 
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import ( TimeoutException,
+	NoSuchElementException, StaleElementReferenceException )
 
 _random = secrets.SystemRandom()
 randrange = _random.randrange
 
 timeout_multiplier = 1
-driver_timeout = 10 # <-- Adjust in seconds
-driver_long_timeout = 15
+driver_timeout = 15 # <-- Adjust in seconds
+driver_long_timeout = 25
 
-def check_exists_by_xpath(xpath):
+server_gettime_req = (
+	f'''var date = new Date($.ajax({{async: false, type: 'GET', '''
+	f'''contentType: 'application/json;charset=utf-8' '''
+	f'''}}).getResponseHeader( 'Date' )); return [ '''
+	f'''date.getFullYear(), date.getMonth() + 1, date.getDate(), '''
+	f'''date.getHours(), date.getMinutes(), date.getSeconds(), 0] '''
+)
+
+def check_exists_by_xpath( xpath ):
 	try:
-		driver.find_element_by_xpath(xpath)
+		driver.find_element_by_xpath( xpath )
 	except NoSuchElementException:
 		return False
 	return True
@@ -52,7 +61,7 @@ def check_input( parameters ):
 	return profile_dir, bin_dir
 	
 def initialize_profile( f_profile_dir ):				
-	firefox_profile = webdriver.FirefoxProfile(f_profile_dir)
+	firefox_profile = webdriver.FirefoxProfile( f_profile_dir )
 	return firefox_profile
 		
 def initialize_driver( f_profile_dir, f_binary, f_profile, ua ):
@@ -71,13 +80,35 @@ def initialize_driver( f_profile_dir, f_binary, f_profile, ua ):
 								firefox_profile=f_profile, service_log_path=os.devnull)
 	return driver
 
+def portal_authenticate( obj ):
+
+	pages = [ method for method in dir( obj ) if ( method.endswith('page') ) ]
+	for page in pages:
+		try:
+			getattr( obj, page )()
+		except:
+			driver.quit()
+			print(f'{datetime.datetime.now()} - {page} Error {{\n{sys.exc_info()} }}\n')
+			sys.exit(254)
+
+class wait_for_text_to_match( object ):
+    def __init__(self, locator, pattern):
+        self.locator = locator
+        self.pattern = re.compile(pattern)
+
+    def __call__(self, driver):
+        try:
+            element_text = EC._find_element(driver, self.locator).text
+            return self.pattern.search(element_text)
+        except StaleElementReferenceException:
+            return False
+
 class User:
-	__slots__ = ['first_name','last_name','zip_code']
+	__slots__ = ['first_name','last_name']
         
-	def __init__( self, first_name, last_name, zip_code ):
+	def __init__( self, first_name, last_name ):
 		self.first_name = first_name
 		self.last_name = last_name
-		self.zip_code = zip_code
 		
 	salt = bytes( '%.4f' % time.process_time_ns(), 'utf8' )
 
@@ -122,8 +153,7 @@ class User:
 class XfinityForms( User ):
 	def __init__( self, driver ):
 		generator = Faker()
-		User.__init__( self, generator.first_name(), generator.last_name(),
-													 generator.zipcode() )
+		User.__init__( self, generator.first_name(), generator.last_name() )
 		self.driver = driver
 		self.wait = WebDriverWait( driver, driver_timeout )						 
 		self.long_wait = WebDriverWait( driver, driver_long_timeout )						 
@@ -137,7 +167,7 @@ class XfinityForms( User ):
 		try:
 			free_opt = wait.until(EC.presence_of_element_located((By.XPATH,"//*[contains(text(), 'Complimentary')]")))
 		except TimeoutException:
-			driver.close()
+			driver.quit()
 			print("No Free Option To Select")
 			sys.exit(255)
 				
@@ -146,108 +176,96 @@ class XfinityForms( User ):
 
 		free_opt.click()
 		
-		time_tuple = driver.execute_script("var date = new Date($.ajax({" 				+ \
-			"async: false, type: 'GET', contentType: 'application/json;charset=utf-8'" 	+ \
-			"}).getResponseHeader( 'Date' )); return [ " 								+ \
-			"date.getFullYear(), date.getMonth() + 1, date.getDate(), "					+ \
-			"date.getHours(), date.getMinutes(), date.getSeconds(), 0]")
-		
+		time_tuple = driver.execute_script(server_gettime_req)
 		set_time._linux_set_time(time_tuple)
 		
 		first_submit.click()
 
 		if check_exists_by_xpath("/html/body/div[1]/div/div[3]/div[2]"):
 			decline = wait.until(EC.presence_of_element_located((By.XPATH,"//button[@id='upgradeOfferCancelButton']")))
-			decline.click();
-		
+			decline.click()
+
 	def second_page( self ):
 		driver = self.driver
 		wait = self.wait
+		unq_hostname = self.unq_hostname
+			
+		first_name_box = wait.until(EC.presence_of_element_located((By.XPATH,"//*[@id='firstName']")))		
+		last_name_box = driver.find_element_by_xpath("//*[@id='lastName']")
 		
-		first_name_box = wait.until(EC.presence_of_element_located((By.XPATH,"//input[@placeholder='First Name']")))
-		last_name_box = driver.find_element_by_xpath("//input[@placeholder='Last Name']")
-		email_box = driver.find_element_by_xpath("//input[@placeholder='Email']")
-		zip_code_box = driver.find_element_by_xpath("//input[@placeholder='Zip Code']")
-
 		driver.execute_script("window.stop();")
 
 		first_name_box.send_keys(self.first_name)
 		last_name_box.send_keys(self.last_name)
+						
+		password = driver.find_element_by_xpath("//input[@id='password']")
+		password_retype = driver.find_element_by_xpath("//input[@id='passwordRetype']")
+		password.send_keys(unq_hostname + "$")
+		password_retype.send_keys(unq_hostname + "$")
+	
+		username = wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='usePersonalEmail']"))).click()
+		email_box = driver.find_element_by_xpath("//*[@id='primaryEmail']")
 		email_box.send_keys(self.email)
-		zip_code_box.send_keys(self.zip_code)
-		zip_code_box.send_keys(Keys.TAB)
-		wait.until(EC.element_to_be_clickable((By.XPATH,"//*[contains(text(), 'Continue')]"))).click()
+	
+		drop_menu = wait.until(EC.element_to_be_clickable((By.XPATH,"/html/body/main/div/form/div[4]/fieldset/select/option[2]")))
+		secret_answer = driver.find_element_by_xpath("//input[@id='secretAnswer']")	
+		drop_menu.click()
+		secret_answer.send_keys(unq_hostname)
+	
+		wait.until(EC.element_to_be_clickable((By.XPATH,"//*[@id='submitButton']"))).click()
 
 	def third_page( self ):
 		driver = self.driver
 		wait = self.wait
-		unq_hostname = self.unq_hostname
-		
-		username = wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='usePersonalEmail']")))
-		password = driver.find_element_by_xpath("//input[@id='password']")
-		password_retype = driver.find_element_by_xpath("//input[@id='passwordRetype']")
-
-		driver.execute_script("window.stop();")
-
-		drop_menu = wait.until(EC.element_to_be_clickable((By.XPATH,"//select[@id='secretQuestion']//option[2]")))
-		secret_answer = driver.find_element_by_xpath("//input[@id='secretAnswer']")
-		third_submit = wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='submitButton']")))
-
-		username.click()
-		drop_menu.click()
-		secret_answer.send_keys(unq_hostname)
-		password.send_keys(unq_hostname + "$")
-		password_retype.send_keys(unq_hostname + "$")
-		third_submit.click()
-		
-	def fourth_page( self ):
-		driver = self.driver
-		wait = self.wait
 		long_wait = self.long_wait
 		
-		time_message = long_wait.until(EC.presence_of_element_located((By.XPATH,"//span[@id='orderConfirmationSponsoredExpirationDate']"))).text.strip().split(' ')
-
+		time_message = long_wait.until(EC.presence_of_element_located((By.XPATH,"//span[@id='orderConfirmationSponsoredExpirationDate']"))).text
+				
 		driver.execute_script("window.stop();")
+	
+		time_m_list = time_message.strip().split(' ')	
+		final_submit = long_wait.until(EC.element_to_be_clickable((By.XPATH,"//button[@id='_orderConfirmationActivatePass']")))
 
-		final_submit = wait.until(EC.presence_of_element_located((By.XPATH,"//button[@id='_orderConfirmationActivatePass']")))
-
-		military_time = time_message[6].split(':')
+		military_time = time_m_list[6].split(':')
 
 		#Check Time then Convert to Military Time 
-		if ((time_message[7] == 'PM' and str(military_time[0]) != '12') or 
-			(time_message[7] == 'AM' and str(military_time[0]) == '12')):
-			military_time[0] = int(military_time[0]) + 12
-			hour_time = str(military_time[0])
+		if (time_m_list[7] == 'PM' and str(military_time[0]) != '12'):
+			hour_time = str((int(military_time[0]) + 12))
+		elif (time_m_list[7] == 'AM' and str(military_time[0]) == '12'):
+			hour_time = "0"
 		else:
 			hour_time = military_time[0]
 			
 		min_time = military_time[1].lstrip("0")
-
-		with open ("global_vars.csv", mode='a') as global_vars:
-			csv_writer = csv.writer(global_vars)
-			csv_writer.writerow([hour_time,min_time])
-
+		
+		try:
+			with open ("global_vars.csv", mode='a') as global_vars:
+				csv_writer = csv.writer(global_vars)
+				csv_writer.writerow([hour_time, min_time])
+		finally:
+			global_vars.close()
+		
 		if final_submit.is_enabled():
 			final_submit.click()
 			
 	def tear_down( self, f_profile, f_profile_dir ):
-		src_files = os.listdir(f_profile.path)
-		root_src_dir = f_profile.path
-		root_dst_dir = f_profile_dir
+		# src_files = os.listdir(f_profile.path)
+		# root_src_dir = f_profile.path
+		# root_dst_dir = f_profile_dir
 
-		for src_dir, dirs, files in os.walk(root_src_dir):
-			dst_dir = src_dir.replace(root_src_dir, root_dst_dir, 1)
-			if not os.path.exists(dst_dir):
-				os.makedirs(dst_dir)
-			for file_ in files:
-				src_file = os.path.join(src_dir, file_)
-				dst_file = os.path.join(dst_dir, file_)
-				if os.path.exists(dst_file):
-					# in case of the src and dst are the same file
-					if os.path.samefile(src_file, dst_file):
-						continue
-					os.remove(dst_file)
-				shutil.move(src_file, dst_dir)
+		# for src_dir, dirs, files in os.walk(root_src_dir):
+			# dst_dir = src_dir.replace(root_src_dir, root_dst_dir, 1)
+			# if not os.path.exists(dst_dir):
+				# os.makedirs(dst_dir)
+			# for file_ in files:
+				# src_file = os.path.join(src_dir, file_)
+				# dst_file = os.path.join(dst_dir, file_)
+				# if os.path.exists(dst_file):
+					# # in case of the src and dst are the same file
+					# if os.path.samefile(src_file, dst_file):
+						# continue
+					# os.remove(dst_file)
+				# shutil.move(src_file, dst_dir)
 		driver.quit()
 		
 f_profile_dir, f_binary_dir = check_input( sys.argv )
@@ -255,16 +273,7 @@ f_profile = initialize_profile( f_profile_dir )
 user_agent = generate_user_agent()
 
 driver = initialize_driver( f_profile_dir, f_binary_dir, f_profile, user_agent )
-xfinity = XfinityForms( driver )
 
-try:
-	xfinity.first_page()
-	xfinity.second_page()
-	xfinity.third_page()
-	xfinity.fourth_page()
-except:
-	driver.close()
-	print(sys.exc_info()[0])
-	sys.exit(254)
-	
+xfinity = XfinityForms( driver )
+portal_authenticate( xfinity )
 xfinity.tear_down( f_profile, f_profile_dir )
